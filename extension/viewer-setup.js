@@ -3,7 +3,7 @@
 // viewer starts.
 "use strict";
 
-document.title = "PDF Ink Eraser";
+document.title = "PDF Annotator";
 
 document.addEventListener("webviewerloaded", () => {
   const app = window.PDFViewerApplication;
