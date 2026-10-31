@@ -35,12 +35,14 @@
   }
 }
 
-/* Pointer events go to the eraser, never to the pencil tool or existing marks. */
+/* Pointer events go to the page itself, never to the layers on top of it: the
+   text layer would select text and show the I-beam cursor, links would open,
+   and the pencil tool or existing marks would react. */
 .inkEraserActive #viewerContainer .page {
   cursor: none;
-}
+  user-select: none;
 
-.inkEraserActive .annotationEditorLayer,
-.inkEraserActive .annotationEditorLayer * {
-  pointer-events: none !important;
+  & * {
+    pointer-events: none !important;
+  }
 }
