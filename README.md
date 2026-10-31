@@ -1,5 +1,8 @@
 # PDF Ink Eraser
 
+**[Get it from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/pdf-ink-eraser/)** (waiting for Mozilla's
+review: the link works once it's approved)
+
 A Firefox extension that adds a real eraser to the PDF viewer. Drag over a pencil drawing or a highlight and only the
 part under the eraser disappears, like the eraser in Paint. The built-in viewer can only delete a whole drawing at once.
 
