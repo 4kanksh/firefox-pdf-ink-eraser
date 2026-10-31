@@ -40,7 +40,9 @@
     // sRGB: apply the curve to the colour values as shown, not to linear light.
     const filter = svgElement("filter", { id: "invertColorsLift", "color-interpolation-filters": "sRGB" });
     filter.append(transfer);
-    const svg = svgElement("svg", { "aria-hidden": "true", style: "position: absolute; width: 0; height: 0" });
+    // Hidden by viewer-setup.css: the viewer's security policy blocks style
+    // attributes.
+    const svg = svgElement("svg", { id: "invertColorsFilters", "aria-hidden": "true" });
     svg.append(filter);
     document.body.append(svg);
   }

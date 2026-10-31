@@ -39,6 +39,12 @@
    whole canvas wrapper, so pencil marks and highlights drawn on top of the
    page are inverted along with it. url(#invertColorsLift) is the gamma
    curve that keeps pale colours visible (see invert-colors.js). */
+#invertColorsFilters {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
 #invertColorsButton::before {
   -webkit-mask-image: url(invert-colors.svg);
   mask-image: url(invert-colors.svg);
