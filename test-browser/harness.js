@@ -159,6 +159,9 @@ export async function open(rotation, zoom) {
     }
     app.eventBus.dispatch("switchannotationeditormode", { source: window, mode: 0 });
     await wait(200);
+    // pdf.js downloads a document with unsaved changes when it closes it (as
+    // opening another one does), which pops up a save dialog for every test.
+    app.pdfDocument.annotationStorage.resetModified();
   }
   await app.open({ data: sample.slice() });
   await until(() => app.pdfDocument && pageView());
