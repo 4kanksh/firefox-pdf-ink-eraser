@@ -4,10 +4,12 @@
 //   cp test-browser/harness.js dist/extension/viewer/web/
 //   const H = await import("./harness.js");
 //   await H.runView(90, 2); // rotation in degrees, zoom (1 = 100%)
+//   await H.runCrossPage();
 //
-// It draws a pencil line, a freehand highlight and a text highlight on page 1
-// of the pdf.js sample document, erases through each with scripted pointer
-// events, and checks the gaps against the expected eraser width.
+// runView draws a pencil line, a freehand highlight and a text highlight on
+// page 1 of the pdf.js sample document, erases through each with scripted
+// pointer events, and checks the gaps against the expected eraser width.
+// runCrossPage erases two pages with one drag and checks the undo step.
 
 const app = window.PDFViewerApplication;
 
@@ -26,11 +28,12 @@ async function until(fn, ms = 8000) {
 }
 
 const uiManager = () => app.pdfViewer._layerProperties.annotationEditorUIManager;
-const pageView = () => app.pdfViewer.getPageView(0);
+const pageView = (page = 0) => app.pdfViewer.getPageView(page);
 
-export function screenOf(x, y) {
-  const [vx, vy] = pageView().viewport.convertToViewportPoint(x, y);
-  const box = pageView().div.querySelector(".canvasWrapper").getBoundingClientRect();
+// Points are [x, y] in PDF units on page 1, or [x, y, page] (0-based) elsewhere.
+export function screenOf(x, y, page = 0) {
+  const [vx, vy] = pageView(page).viewport.convertToViewportPoint(x, y);
+  const box = pageView(page).div.querySelector(".canvasWrapper").getBoundingClientRect();
   return [box.left + vx, box.top + vy];
 }
 
@@ -78,19 +81,23 @@ function fire(type, [x, y]) {
   target.dispatchEvent(event);
 }
 
-async function rendered() {
+async function rendered(pages = [0]) {
   app.pdfViewer.update();
-  app.pdfViewer.renderingQueue.renderHighestPriority();
-  await until(
-    () =>
-      pageView().renderingState === 3 &&
-      pageView().div.querySelector(".textLayer span") &&
-      pageView().div.querySelector(".annotationEditorLayer")
-  );
+  await until(() => {
+    // Rendering one page at a time, so keep nudging the queue.
+    app.pdfViewer.renderingQueue.renderHighestPriority();
+    return pages.every(
+      page =>
+        pageView(page).renderingState === 3 &&
+        pageView(page).div.querySelector(".textLayer span") &&
+        pageView(page).div.querySelector(".annotationEditorLayer")
+    );
+  });
   await wait(150);
 }
 
-// Scrolls so the given PDF points are in the middle of the viewer.
+// Scrolls so the given PDF points are in the middle of the viewer, and waits
+// for their pages to render.
 export async function show(points) {
   const container = app.appConfig.mainContainer;
   const view = container.getBoundingClientRect();
@@ -100,18 +107,21 @@ export async function show(points) {
   container.scrollLeft += (Math.min(...xs) + Math.max(...xs)) / 2 - (view.left + view.width / 2);
   container.scrollTop += (Math.min(...ys) + Math.max(...ys)) / 2 - (view.top + view.height / 2);
   await wait(100);
-  await rendered();
+  await rendered([...new Set(points.map(p => p[2] ?? 0))]);
 }
 
-// Drags from one PDF point to another in `steps` pointer moves.
+// Drags in a straight line on screen from one PDF point to another (possibly
+// on another page) in `steps` pointer moves.
 export async function drag(a, b, steps = 25) {
-  fire("pointerdown", screenOf(...a));
+  const start = screenOf(...a);
+  const end = screenOf(...b);
+  fire("pointerdown", start);
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    fire("pointermove", screenOf(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t));
+    fire("pointermove", [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t]);
     await wait(4);
   }
-  fire("pointerup", screenOf(...b));
+  fire("pointerup", end);
   await wait(250);
 }
 
@@ -160,8 +170,8 @@ export async function open(rotation, zoom) {
 
 // The marks on page 1: kind, geometry in PDF units, and the centre of the box
 // they are drawn in on screen.
-export function marks() {
-  return [...uiManager().getEditors(0)]
+export function marks(page = 0) {
+  return [...uiManager().getEditors(page)]
     .filter(editor => !editor.deleted && !editor.isEmpty())
     .map(editor => {
       const r = editor.div.getBoundingClientRect();
@@ -301,5 +311,37 @@ export async function runView(rotation, zoom) {
     ];
     result.textHighlight = report(gap, [round(cx - radius), round(cx + radius)], mark.boxes.length, [drawOffset(mark, bbox)]);
   }
+  return result;
+}
+
+export async function runCrossPage() {
+  await open(0, 1);
+  const radius = +document.getElementById("editorInkEraserSize").value / pageView().viewport.scale;
+  const inkLines = page => marks(page).filter(m => m.kind === "ink").flatMap(m => m.lines.map(l => [round(l[0]), round(l.at(-2))]));
+  const editingAction = async name => {
+    app.eventBus.dispatch("editingaction", { source: window, name });
+    await wait(300);
+  };
+
+  // A line near the bottom of page 1 and one near the top of page 2.
+  await show([[300, 40, 0], [300, 750, 1]]);
+  await tool("ink");
+  await drag([150, 40, 0], [450, 40, 0]);
+  await drag([150, 750, 1], [450, 750, 1]);
+  await tool("eraser");
+
+  // One drag from page 1, across the gap, onto page 2.
+  await drag([300, 60, 0], [300, 730, 1], 30);
+  const h = radius + marks(0)[0].thickness / 2;
+  const expected = [round(300 - h), round(300 + h)];
+  const result = { expectedGap: expected };
+  for (const page of [0, 1]) {
+    result[`page${page + 1}`] = report(gapAt(inkLines(page), 300), expected, inkLines(page).length, [0]);
+  }
+  await editingAction("undo");
+  const whole = [0, 1].every(page => inkLines(page).length === 1);
+  await editingAction("redo");
+  const cutAgain = [0, 1].every(page => inkLines(page).length === 2);
+  result.undo = whole && cutAgain ? "PASS one step restores and redoes both pages" : "FAIL";
   return result;
 }

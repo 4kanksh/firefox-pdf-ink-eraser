@@ -25,7 +25,9 @@ let uiManager = null;
 let active = false;
 // In CSS pixels, so the eraser has the same on-screen size at any zoom level.
 let radius = loadRadius();
-// The drag in progress: { pageIndex, pointerId, last, removed, added, queue }.
+// The drag in progress: { pointerId, last, removed, added, queue }, where
+// last = { pageIndex, point } is the previous pointer position in PDF
+// coordinates of a page, so it stays put if the view scrolls mid-drag.
 let drag = null;
 let ui = null;
 
@@ -130,11 +132,58 @@ function pageViewport(pageIndex) {
   return app.pdfViewer.getPageView(pageIndex)?.viewport ?? null;
 }
 
-/** Convert a pointer position to PDF coordinates on the given page. */
-function toPdfPoint(pageIndex, event) {
+function pageBox(pageView) {
+  return (pageView.div.querySelector(".canvasWrapper") ?? pageView.div).getBoundingClientRect();
+}
+
+/** Convert a screen position to PDF coordinates on the given page. */
+function toPdfPoint(pageIndex, [x, y]) {
   const pageView = app.pdfViewer.getPageView(pageIndex);
-  const box = (pageView.div.querySelector(".canvasWrapper") ?? pageView.div).getBoundingClientRect();
-  return pageView.viewport.convertToPdfPoint(event.clientX - box.left, event.clientY - box.top);
+  const box = pageBox(pageView);
+  return pageView.viewport.convertToPdfPoint(x - box.left, y - box.top);
+}
+
+/** Convert PDF coordinates on the given page to a screen position. */
+function toScreenPoint(pageIndex, [px, py]) {
+  const pageView = app.pdfViewer.getPageView(pageIndex);
+  const box = pageBox(pageView);
+  const [x, y] = pageView.viewport.convertToViewportPoint(px, py);
+  return [box.left + x, box.top + y];
+}
+
+/** The index of the page at a screen position, or -1 between pages. */
+function pageIndexAt([x, y]) {
+  const pageDiv = document.elementFromPoint(x, y)?.closest("#viewer .page");
+  return pageDiv ? Number(pageDiv.dataset.pageNumber) - 1 : -1;
+}
+
+/**
+ * The pages the eraser reaches while moving from a to b (screen positions).
+ * Candidates are the pages under a and b and the previous page, with their
+ * neighbours: the eraser can hang over the edge of the next page, and in
+ * spread modes the page beside or below can be two indexes away.
+ */
+function pagesReached(a, b, previousPage) {
+  const candidates = new Set();
+  for (const center of [pageIndexAt(a), pageIndexAt(b), previousPage]) {
+    if (center >= 0) {
+      for (let i = center - 2; i <= center + 2; i++) {
+        candidates.add(i);
+      }
+    }
+  }
+  const minX = Math.min(a[0], b[0]) - radius;
+  const maxX = Math.max(a[0], b[0]) + radius;
+  const minY = Math.min(a[1], b[1]) - radius;
+  const maxY = Math.max(a[1], b[1]) + radius;
+  return [...candidates].filter(i => {
+    const pageView = app.pdfViewer.getPageView(i);
+    if (!pageView) {
+      return false;
+    }
+    const box = pageBox(pageView);
+    return box.left <= maxX && box.right >= minX && box.top <= maxY && box.bottom >= minY;
+  });
 }
 
 function hexToRgb(hex) {
@@ -252,14 +301,14 @@ function addQuietly(editor) {
   }
 }
 
-async function eraseSweep(state, [ax, ay], [bx, by]) {
-  const layer = uiManager.getLayer(state.pageIndex);
-  const viewport = pageViewport(state.pageIndex);
+async function eraseSweep(state, pageIndex, [ax, ay], [bx, by]) {
+  const layer = uiManager.getLayer(pageIndex);
+  const viewport = pageViewport(pageIndex);
   if (!layer || !viewport) {
     return;
   }
   const sweep = { ax, ay, bx, by, r: radius / viewport.scale };
-  for (const editor of [...uiManager.getEditors(state.pageIndex)]) {
+  for (const editor of [...uiManager.getEditors(pageIndex)]) {
     if (!isErasable(editor)) {
       continue;
     }
@@ -302,9 +351,9 @@ function recordUndo({ removed, added }) {
 }
 
 function updateCursor(event) {
-  const overPage = active && (drag || event.target.closest?.("#viewerContainer .page"));
-  ui.cursor.hidden = !overPage;
-  if (overPage) {
+  const overPages = active && (drag || event.target.closest?.("#viewer"));
+  ui.cursor.hidden = !overPages;
+  if (overPages) {
     ui.cursor.style.width = ui.cursor.style.height = `${2 * radius}px`;
     ui.cursor.style.left = `${event.clientX}px`;
     ui.cursor.style.top = `${event.clientY}px`;
@@ -312,11 +361,8 @@ function updateCursor(event) {
 }
 
 function onPointerDown(event) {
-  if (!active || event.button !== 0) {
-    return;
-  }
-  const pageDiv = event.target.closest?.(".page");
-  if (!pageDiv) {
+  // The pages and the gaps between them, but not the scrollbars.
+  if (!active || event.button !== 0 || !event.target.closest?.("#viewer")) {
     return;
   }
   // Keep the event from reaching the pencil tool and the text layer.
@@ -325,21 +371,33 @@ function onPointerDown(event) {
   ui.params.classList.add("hidden");
   ui.button.setAttribute("aria-expanded", "false");
 
-  const pageIndex = Number(pageDiv.dataset.pageNumber) - 1;
-  const point = toPdfPoint(pageIndex, event);
+  const position = [event.clientX, event.clientY];
+  const pageIndex = pageIndexAt(position);
   drag = {
-    pageIndex,
     pointerId: event.pointerId,
-    last: point,
+    last: null,
     removed: new Set(),
     added: new Set(),
     queue: Promise.resolve(),
   };
-  enqueueSweep(drag, point, point);
+  eraseTo(position, pageIndex >= 0 ? pageIndex : app.pdfViewer.currentPageNumber - 1);
 }
 
-function enqueueSweep(state, from, to) {
-  state.queue = state.queue.then(() => eraseSweep(state, from, to)).catch(error => console.error("Eraser:", error));
+/** Erase from the previous pointer position to `position`, on every page reached. */
+function eraseTo(position, previousPage = drag.last.pageIndex) {
+  const from = drag.last ? toScreenPoint(drag.last.pageIndex, drag.last.point) : position;
+  for (const pageIndex of pagesReached(from, position, previousPage)) {
+    enqueueSweep(drag, pageIndex, toPdfPoint(pageIndex, from), toPdfPoint(pageIndex, position));
+  }
+  const pageIndex = pageIndexAt(position);
+  const lastPage = pageIndex >= 0 ? pageIndex : previousPage;
+  drag.last = { pageIndex: lastPage, point: toPdfPoint(lastPage, position) };
+}
+
+function enqueueSweep(state, pageIndex, from, to) {
+  state.queue = state.queue
+    .then(() => eraseSweep(state, pageIndex, from, to))
+    .catch(error => console.error("Eraser:", error));
 }
 
 function onPointerMove(event) {
@@ -356,9 +414,7 @@ function onPointerMove(event) {
   // this one; using them keeps fast drags from skipping over thin strokes.
   const coalesced = event.getCoalescedEvents?.();
   for (const moved of coalesced?.length ? coalesced : [event]) {
-    const point = toPdfPoint(drag.pageIndex, moved);
-    enqueueSweep(drag, drag.last, point);
-    drag.last = point;
+    eraseTo([moved.clientX, moved.clientY]);
   }
 }
 

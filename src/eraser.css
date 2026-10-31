@@ -35,14 +35,15 @@
   }
 }
 
-/* Pointer events go to the page itself, never to the layers on top of it: the
-   text layer would select text and show the I-beam cursor, links would open,
-   and the pencil tool or existing marks would react. */
-.inkEraserActive #viewerContainer .page {
+/* Pointer events go to the pages (or the gaps between them), never to the
+   layers on top of a page: the text layer would select text and show the
+   I-beam cursor, links would open, and the pencil tool or existing marks would
+   react. */
+.inkEraserActive #viewer {
   cursor: none;
   user-select: none;
 
-  & * {
+  & .page * {
     pointer-events: none !important;
   }
 }
