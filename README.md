@@ -73,6 +73,47 @@ npm run build
 | `npm run package` | Build, then zip the extension into `web-ext-artifacts/` |
 | `npm run sign` | Build, then have Mozilla sign it as an unlisted add-on (see below) |
 
+### Building an exact copy of a release
+
+These steps produce the same files as the package uploaded to addons.mozilla.org.
+
+**Requirements**
+
+- Any operating system that runs Node.js: Windows, macOS or Linux. Releases are built on Windows 11.
+- [Node.js](https://nodejs.org/) 20 or newer, which includes npm. Releases are built with Node.js 20.10.0 and
+  npm 10.2.3. Install it from https://nodejs.org/ (the LTS version) or with your system's package manager, then
+  check it with `node --version`.
+- No other programs. The only build dependency, Mozilla's `web-ext` tool, is installed by step 2 at the exact
+  version recorded in `package-lock.json`.
+
+**Steps**
+
+1. Unpack the source code and open a terminal in its folder (the one containing `package.json`).
+2. Install the build tools exactly as recorded in `package-lock.json`:
+   ```bash
+   npm ci
+   ```
+3. Build and package the extension:
+   ```bash
+   npm run package
+   ```
+
+The extension is now in `web-ext-artifacts/pdf_annotator_draw_highlight_erase-<version>.zip`, and unpacked in
+`dist/extension/`.
+
+**What the build script does** (`scripts/build.mjs`, run by step 3; it uses only Node.js itself):
+
+1. Deletes `dist/`, then copies `extension/background.js` and `extension/icons/` into `dist/extension/` and writes
+   `extension/manifest.json` there with the version from `package.json`.
+2. Copies the official, unmodified pdf.js release from `vendor/pdfjs-6.4.299/` into `dist/extension/viewer/`, leaving
+   out its source maps (`*.map`) and sample PDF.
+3. Copies the eraser from `src/` into `viewer/web/ink-eraser/`, and the viewer additions from `extension/` into
+   `viewer/web/extension/`.
+4. Adds five `<script>` and `<link>` tags to `viewer/web/viewer.html` that load those files.
+
+Nothing is minified, transpiled or bundled: every file in the package is either an unmodified pdf.js file or a copy
+of a file in this repository.
+
 ### Signing
 
 Firefox only installs extensions permanently once Mozilla has signed them. `npm run sign` uploads the extension
