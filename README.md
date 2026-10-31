@@ -1,4 +1,4 @@
-# PDF Annotator: Draw, Highlight & Erase
+# PDF Ink Eraser
 
 A Firefox extension that adds a real eraser to the PDF viewer. Drag over a pencil drawing or a highlight and only the
 part under the eraser disappears, like the eraser in Paint. The built-in viewer can only delete a whole drawing at once.
@@ -98,7 +98,7 @@ These steps produce the same files as the package uploaded to addons.mozilla.org
    npm run package
    ```
 
-The extension is now in `web-ext-artifacts/pdf_annotator_draw_highlight_erase-<version>.zip`, and unpacked in
+The extension is now in `web-ext-artifacts/pdf_ink_eraser-<version>.zip`, and unpacked in
 `dist/extension/`.
 
 **What the build script does** (`scripts/build.mjs`, run by step 3; it uses only Node.js itself):

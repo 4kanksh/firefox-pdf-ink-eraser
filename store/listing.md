@@ -5,7 +5,7 @@ taken in Firefox with a made-up sample document).
 
 ## Name
 
-PDF Annotator: Draw, Highlight & Erase
+PDF Ink Eraser
 
 ## Summary
 
@@ -60,6 +60,11 @@ Apache License 2.0
 ## Privacy policy
 
 Not needed: the add-on collects no data. The manifest declares `data_collection_permissions: none`.
+
+## Release notes (1.0.1)
+
+The add-on is called PDF Ink Eraser everywhere: in Firefox's add-ons list, on the toolbar button and in the
+viewer tab.
 
 ## Release notes (1.0.0)
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "PDF Annotator: Draw, Highlight & Erase",
+  "name": "PDF Ink Eraser",
   "version": "0.0.0",
   "description": "Draw and highlight on PDFs, then erase exactly where you drag, like in Paint. With one-click inverted colours for reading at night.",
   "icons": {
@@ -9,7 +9,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Open PDF Annotator",
+    "default_title": "Open PDF Ink Eraser",
     "default_icon": "icons/icon.svg"
   },
   "optional_permissions": ["downloads"],
