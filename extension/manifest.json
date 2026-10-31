@@ -11,6 +11,7 @@
     "default_title": "Open PDF Ink Eraser",
     "default_icon": "icons/icon.svg"
   },
+  "optional_permissions": ["downloads"],
   "background": {
     "scripts": ["background.js"]
   },
