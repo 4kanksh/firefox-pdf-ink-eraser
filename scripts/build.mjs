@@ -2,10 +2,15 @@
 // pdf.js viewer plus our files, with a few tags added to viewer.html to load
 // them.
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PDFJS_VERSION = "6.4.299";
+// pdf.js files the viewer never loads: the sample document it opens by
+// default (ours opens nothing) and the source maps for debugging pdf.js.
+// Together they are about half the size of the dist folder.
+const SAMPLE_PDF = "compressed.tracemonkey-pldi-09.pdf";
+const isUnused = path => path.endsWith(".map") || basename(path) === SAMPLE_PDF;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const vendor = join(root, "vendor", `pdfjs-${PDFJS_VERSION}`);
@@ -23,7 +28,7 @@ cpSync(join(root, "extension", "background.js"), join(out, "background.js"));
 writeFileSync(join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
 // The viewer, with the eraser and the extension setup next to it.
-cpSync(vendor, join(out, "viewer"), { recursive: true });
+cpSync(vendor, join(out, "viewer"), { recursive: true, filter: path => !isUnused(path) });
 for (const file of ["eraser.js", "eraser-geometry.js", "eraser.css", "eraser.svg"]) {
   cpSync(join(root, "src", file), join(web, "ink-eraser", file));
 }

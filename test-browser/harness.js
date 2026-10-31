@@ -1,7 +1,8 @@
 // Browser test harness for the eraser. Not part of the extension.
 //
-// Copy it next to the built viewer and load it from the page's console:
-//   cp test-browser/harness.js dist/extension/viewer/web/
+// Copy it and the pdf.js sample document (left out of the build) next to the
+// built viewer, and load it from the page's console:
+//   cp test-browser/harness.js vendor/pdfjs-6.4.299/web/compressed.tracemonkey-pldi-09.pdf dist/extension/viewer/web/
 //   const H = await import("./harness.js");
 //   await H.runView(90, 2); // rotation in degrees, zoom (1 = 100%)
 //   await H.runCrossPage();
