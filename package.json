@@ -6,7 +6,13 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "lint": "npm run build && web-ext lint --source-dir dist/extension",
+    "start": "npm run build && web-ext run --source-dir dist/extension --url about:debugging#/runtime/this-firefox",
+    "package": "npm run build && web-ext build --source-dir dist/extension --artifacts-dir web-ext-artifacts --overwrite-dest"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "web-ext": "^10.8.0"
+  }
 }

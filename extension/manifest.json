@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "PDF Ink Eraser",
+  "version": "0.0.0",
+  "description": "A PDF viewer with a real eraser: erase pencil drawings and highlights exactly where you drag, like in Paint.",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "action": {
+    "default_title": "Open PDF Ink Eraser",
+    "default_icon": "icons/icon.svg"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pdf-ink-eraser@4kanksh",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  }
+}

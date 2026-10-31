@@ -1,0 +1,34 @@
+/* Start hint shown until a PDF is opened. */
+
+#startHint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--main-color);
+  font: message-box;
+  font-size: 15px;
+
+  > button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background-color: #0060df;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #0250bb;
+    }
+  }
+
+  > p {
+    margin: 0;
+    opacity: 0.8;
+  }
+}
