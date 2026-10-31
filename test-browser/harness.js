@@ -10,6 +10,7 @@
 // page 1 of the pdf.js sample document, erases through each with scripted
 // pointer events, and checks the gaps against the expected eraser width.
 // runCrossPage erases two pages with one drag and checks the undo step.
+// runShortcutsAndPen checks the E, [ and ] keys and the pen's eraser end.
 
 const app = window.PDFViewerApplication;
 
@@ -58,8 +59,13 @@ function localPoint(element, x, y) {
   return [local.x, local.y];
 }
 
-// Sends a pointer event to whatever is under the point, as a real mouse would.
-function fire(type, [x, y]) {
+const MOUSE = { pointerType: "mouse", pointerId: 7, button: 0, buttons: 1 };
+// A pen touching the screen with its eraser end.
+const PEN_ERASER = { pointerType: "pen", pointerId: 8, button: 5, buttons: 32 };
+
+// Sends a pointer event to whatever is under the point, as a real mouse (or
+// another pointer) would.
+function fire(type, [x, y], pointer = MOUSE) {
   const target = document.elementFromPoint(x, y);
   const event = new PointerEvent(type, {
     bubbles: true,
@@ -67,11 +73,11 @@ function fire(type, [x, y]) {
     composed: true,
     clientX: x,
     clientY: y,
-    pointerId: 7,
-    pointerType: "mouse",
+    pointerId: pointer.pointerId,
+    pointerType: pointer.pointerType,
     isPrimary: true,
-    button: 0,
-    buttons: type === "pointerup" ? 0 : 1,
+    button: type === "pointermove" ? -1 : pointer.button,
+    buttons: type === "pointerup" ? 0 : pointer.buttons,
   });
   // Chromium computes offsetX/Y wrongly for scripted events on scaled displays,
   // and the pdf.js pencil reads them.
@@ -112,16 +118,16 @@ export async function show(points) {
 
 // Drags in a straight line on screen from one PDF point to another (possibly
 // on another page) in `steps` pointer moves.
-export async function drag(a, b, steps = 25) {
+export async function drag(a, b, steps = 25, pointer = MOUSE) {
   const start = screenOf(...a);
   const end = screenOf(...b);
-  fire("pointerdown", start);
+  fire("pointerdown", start, pointer);
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    fire("pointermove", [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t]);
+    fire("pointermove", [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t], pointer);
     await wait(4);
   }
-  fire("pointerup", end);
+  fire("pointerup", end, pointer);
   await wait(250);
 }
 
@@ -149,7 +155,7 @@ export async function tool(name) {
 
 let sample = null;
 
-export async function open(rotation, zoom) {
+export async function open(rotation, zoom, data = null) {
   sample ??= new Uint8Array(await fetch("compressed.tracemonkey-pldi-09.pdf").then(r => r.arrayBuffer()));
   // End any drawing session first: pdf.js keeps it across documents, and a
   // session left pointing at the closed document breaks all later drawing.
@@ -163,7 +169,7 @@ export async function open(rotation, zoom) {
     // opening another one does), which pops up a save dialog for every test.
     app.pdfDocument.annotationStorage.resetModified();
   }
-  await app.open({ data: sample.slice() });
+  await app.open({ data: (data ?? sample).slice() });
   await until(() => app.pdfDocument && pageView());
   app.pdfViewer.currentScale = zoom;
   app.pdfViewer.pagesRotation = rotation;
@@ -346,5 +352,91 @@ export async function runCrossPage() {
   await editingAction("redo");
   const cutAgain = [0, 1].every(page => inkLines(page).length === 2);
   result.undo = whole && cutAgain ? "PASS one step restores and redoes both pages" : "FAIL";
+  return result;
+}
+
+export async function runShortcutsAndPen() {
+  await open(0, 1);
+  const result = {};
+  const check = (name, ok, detail = "") => (result[name] = `${ok ? "PASS" : "FAIL"}${detail ? ` ${detail}` : ""}`);
+  const key = (k, options = {}, target = document.body) =>
+    target.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...options }));
+  const size = () => +document.getElementById("editorInkEraserSize").value;
+  const mode = () => app.pdfViewer.annotationEditorMode;
+  const pieces = () => marks().filter(m => m.kind === "ink").reduce((n, m) => n + m.lines.length, 0);
+  const inkEditors = () => marks().filter(m => m.kind === "ink").length;
+  const settle = () => wait(600);
+
+  // Keys.
+  document.activeElement?.blur();
+  await tool("ink");
+  key("e");
+  const onAfterE = eraserOn();
+  key("e");
+  check("E toggles", onAfterE && !eraserOn());
+  key("e", { ctrlKey: true });
+  key("e", { shiftKey: true });
+  check("Ctrl+E and Shift+E ignored", !eraserOn());
+  // A hidden text box can't take focus, so open the find bar first.
+  app.findBar.open();
+  await wait(200);
+  const findInput = document.getElementById("findInput");
+  findInput.focus();
+  key("e", {}, findInput);
+  check("E ignored while typing", document.activeElement === findInput && !eraserOn());
+  app.findBar.close();
+  await wait(200);
+  const before = size();
+  key("]");
+  check("] ignored while eraser off", size() === before);
+  key("e");
+  key("]");
+  const bigger = size();
+  key("[");
+  key("[");
+  const smaller = size();
+  for (let i = 0; i < 40; i++) key("]");
+  const max = size();
+  for (let i = 0; i < 40; i++) key("[");
+  const min = size();
+  check("[ and ] resize", bigger > before && smaller < before && max === 60 && min === 2, `${before} → ${bigger} → ${smaller}, range ${min}–${max}`);
+  document.getElementById("editorInkEraserSize").value = String(before);
+  document.getElementById("editorInkEraserSize").dispatchEvent(new Event("input"));
+  key("e");
+
+  // A pencil line in the top margin, erased with the pen in pencil mode.
+  await show([[100, 775], [400, 775]]);
+  await tool("ink");
+  await drag([100, 775], [400, 775]);
+  await settle();
+  await drag([150, 790], [150, 760], 15, PEN_ERASER);
+  await settle();
+  check("pen in pencil mode", pieces() === 2 && inkEditors() === 1 && mode() === 15 && !eraserOn(), `${pieces()} pieces, ${inkEditors()} editor, mode ${mode()}, eraser ${eraserOn()}`);
+  app.eventBus.dispatch("editingaction", { source: window, name: "undo" });
+  await wait(300);
+  check("pen erase undoes", pieces() === 1);
+  app.eventBus.dispatch("editingaction", { source: window, name: "redo" });
+  await wait(300);
+
+  // Same in highlight mode: goes back to highlighting afterwards.
+  await tool("highlight");
+  await drag([200, 790], [200, 760], 15, PEN_ERASER);
+  await settle();
+  check("pen in highlight mode", pieces() === 3 && mode() === 9 && !eraserOn(), `${pieces()} pieces, mode ${mode()}`);
+
+  // A saved PDF opened without editing (mode 0): its marks aren't editable
+  // objects until pdf.js switches to an editing mode.
+  app.eventBus.dispatch("switchannotationeditormode", { source: window, mode: 0 });
+  await wait(300);
+  const saved = await app.pdfDocument.saveDocument();
+  await open(0, 1, saved);
+  await show([[100, 775], [400, 775]]);
+  const modeBefore = mode();
+  await drag([300, 790], [300, 760], 15, PEN_ERASER);
+  await settle();
+  const modeAfter = mode();
+  await tool("ink");
+  await settle();
+  check("pen with no editing mode", modeBefore === 0 && modeAfter === 0 && pieces() === 4, `mode ${modeBefore} → ${modeAfter}, ${pieces()} pieces`);
   return result;
 }

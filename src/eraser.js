@@ -8,6 +8,9 @@
  * Each pointer move sweeps a capsule (see eraser-geometry.js). Every pencil or
  * highlight editor the capsule touches is removed and replaced by new editors
  * built from its remaining pieces. One drag is one undo step.
+ *
+ * Shortcuts: E turns the eraser on and off, [ and ] change its size. The
+ * eraser end of a pen erases in any editing mode, then goes back to that mode.
  */
 import { bboxesOverlap, capsuleBBox, cutBoxes, cutPolyline } from "./eraser-geometry.js";
 
@@ -18,6 +21,9 @@ const RADIUS_MIN = 2;
 const RADIUS_MAX = 60;
 const RADIUS_DEFAULT = 10;
 const RADIUS_STORAGE_KEY = "inkEraser.radius";
+// Pointer Events report a pen's eraser end (or eraser button) as button 5,
+// which is bit 32 in `buttons`.
+const PEN_ERASER_BUTTONS = 32;
 // Leftover pieces shorter or narrower than this (in PDF units) are dropped.
 const MIN_PIECE_SIZE = 0.5;
 
@@ -25,10 +31,14 @@ let uiManager = null;
 let active = false;
 // In CSS pixels, so the eraser has the same on-screen size at any zoom level.
 let radius = loadRadius();
-// The drag in progress: { pointerId, last, removed, added, queue }, where
-// last = { pageIndex, point } is the previous pointer position in PDF
-// coordinates of a page, so it stays put if the view scrolls mid-drag.
+// The drag in progress: { pointerId, last, removed, added, queue, restoreMode },
+// where last = { pageIndex, point } is the previous pointer position in PDF
+// coordinates of a page, so it stays put if the view scrolls mid-drag, and
+// restoreMode is the mode to go back to after a pen eraser drag.
 let drag = null;
+// Resolves once pdf.js has finished switching to pencil mode for the eraser:
+// until then, marks saved in the PDF aren't editable objects yet.
+let modeReady = Promise.resolve();
 let ui = null;
 
 function loadRadius() {
@@ -41,7 +51,10 @@ function loadRadius() {
   return RADIUS_DEFAULT;
 }
 
-function saveRadius() {
+function setRadius(value) {
+  radius = Math.min(RADIUS_MAX, Math.max(RADIUS_MIN, Math.round(value)));
+  ui.slider.value = String(radius);
+  ui.cursor.style.width = ui.cursor.style.height = `${2 * radius}px`;
   try {
     localStorage.setItem(RADIUS_STORAGE_KEY, String(radius));
   } catch {}
@@ -64,7 +77,8 @@ function createUI() {
       class: "toolbarButton",
       type: "button",
       disabled: "",
-      title: "Eraser",
+      title: "Eraser (E)",
+      "aria-keyshortcuts": "E",
       "aria-pressed": "false",
       "aria-expanded": "false",
       "aria-haspopup": "true",
@@ -81,6 +95,8 @@ function createUI() {
     max: String(RADIUS_MAX),
     step: "1",
     value: String(radius),
+    title: "Smaller: [  Bigger: ]",
+    "aria-keyshortcuts": "[ ]",
     tabindex: "0",
   });
   const params = el("div", { id: "editorInkEraserParamsToolbar", class: "editorParamsToolbar hidden doorHangerRight" }, [
@@ -124,8 +140,13 @@ function setActive(on) {
   if (uiManager.getMode() !== AnnotationEditorType.INK) {
     // In any editing mode pdf.js turns marks saved in the PDF into editable
     // objects. Pencil mode also turns off text selection while erasing.
-    app.eventBus.dispatch("switchannotationeditormode", { source: window, mode: AnnotationEditorType.INK });
+    modeReady = new Promise(resolve => app.eventBus.on("annotationeditormodechanged", resolve, { once: true }));
+    switchMode(AnnotationEditorType.INK);
   }
+}
+
+function switchMode(mode) {
+  app.eventBus.dispatch("switchannotationeditormode", { source: window, mode });
 }
 
 function pageViewport(pageIndex) {
@@ -360,14 +381,27 @@ function updateCursor(event) {
   }
 }
 
+function isPenEraser(event) {
+  return event.pointerType === "pen" && (event.buttons & PEN_ERASER_BUTTONS) !== 0;
+}
+
 function onPointerDown(event) {
+  const penEraser = isPenEraser(event);
+  // The pen's eraser end works even while the eraser is off, as long as there
+  // is a document to edit (the button is enabled).
+  const starts = active ? event.button === 0 || penEraser : penEraser && !ui.button.disabled;
   // The pages and the gaps between them, but not the scrollbars.
-  if (!active || event.button !== 0 || !event.target.closest?.("#viewer")) {
+  if (!starts || !event.target.closest?.("#viewer")) {
     return;
   }
   // Keep the event from reaching the pencil tool and the text layer.
   event.preventDefault();
   event.stopPropagation();
+  let restoreMode;
+  if (!active) {
+    restoreMode = uiManager.getMode();
+    setActive(true);
+  }
   ui.params.classList.add("hidden");
   ui.button.setAttribute("aria-expanded", "false");
 
@@ -378,7 +412,8 @@ function onPointerDown(event) {
     last: null,
     removed: new Set(),
     added: new Set(),
-    queue: Promise.resolve(),
+    queue: modeReady,
+    restoreMode,
   };
   eraseTo(position, pageIndex >= 0 ? pageIndex : app.pdfViewer.currentPageNumber - 1);
 }
@@ -426,17 +461,56 @@ function onPointerUp(event) {
   event.stopPropagation();
   const finished = drag;
   drag = null;
-  finished.queue.then(() => recordUndo(finished));
+  finished.queue.then(() => {
+    recordUndo(finished);
+    if (finished.restoreMode !== undefined && drag) {
+      // The pen is already erasing again: go back after that drag instead.
+      drag.restoreMode ??= finished.restoreMode;
+    } else if (finished.restoreMode !== undefined) {
+      setActive(false);
+      if (finished.restoreMode !== AnnotationEditorType.INK) {
+        switchMode(finished.restoreMode);
+      }
+    }
+  });
+}
+
+/** True while typing in a text field, where letters and brackets are text. */
+function isTyping(element) {
+  const field = element?.isContentEditable || (["INPUT", "TEXTAREA", "SELECT"].includes(element?.tagName) && element.type !== "range");
+  // A closed find bar can leave its hidden text box focused.
+  return field && element.checkVisibility();
+}
+
+function onKeyDown(event) {
+  // AltGr counts as Ctrl+Alt on Windows, and some layouts need it for [ and ].
+  const altGr = event.getModifierState("AltGraph");
+  if (event.defaultPrevented || event.metaKey || ((event.ctrlKey || event.altKey) && !altGr)) {
+    return;
+  }
+  if (drag || ui.button.disabled || app.overlayManager.active || isTyping(document.activeElement)) {
+    return;
+  }
+  if (event.key.toLowerCase() === "e" && !event.shiftKey && !altGr) {
+    if (!event.repeat) {
+      setActive(!active);
+    }
+  } else if (active && (event.key === "[" || event.key === "]")) {
+    // Steps of about a fifth of the size, so small sizes change finely.
+    const step = Math.max(1, Math.round(radius * 0.2));
+    setRadius(event.key === "]" ? radius + step : radius - step);
+  } else {
+    return;
+  }
+  event.preventDefault();
 }
 
 function init() {
   ui = createUI();
 
   ui.button.addEventListener("click", () => setActive(!active));
-  ui.slider.addEventListener("input", () => {
-    radius = Number(ui.slider.value);
-    saveRadius();
-  });
+  ui.slider.addEventListener("input", () => setRadius(Number(ui.slider.value)));
+  window.addEventListener("keydown", onKeyDown);
 
   // Clicking the pencil while erasing should go back to drawing, not turn the
   // pencil off (it's already the underlying mode).
