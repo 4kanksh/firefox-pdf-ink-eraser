@@ -152,8 +152,13 @@ function isErasable(editor) {
  *   (empty when the editor is erased entirely), or null if it isn't touched.
  */
 function cutEditor(editor, sweep) {
+  const isInk = editor.editorType === "ink";
+  const isFree = !isInk && editor._drawOutlines.isFree;
+  // Lines are stored as their centre line, so the eraser reaches half a line
+  // thickness further than its own radius. Text highlight boxes have no thickness.
+  const thickness = isInk ? editor._drawingOptions["stroke-width"] : isFree ? editor._drawingOptions.thickness : 0;
   const rect = editor.getPDFRect();
-  if (!bboxesOverlap(rect, capsuleBBox(sweep))) {
+  if (!bboxesOverlap(rect, capsuleBBox(sweep), thickness / 2)) {
     return null;
   }
   const base = {
@@ -165,11 +170,11 @@ function cutEditor(editor, sweep) {
     opacity: editor.opacity,
   };
 
-  if (editor.editorType === "ink") {
-    const thickness = editor._drawingOptions["stroke-width"];
-    // Cutting the centre line r + thickness/2 around the eraser leaves a
-    // visible gap as wide as the eraser once the round line caps are drawn.
-    const capsule = { ...sweep, r: sweep.r + thickness / 2 };
+  // Cutting the centre line r + thickness/2 around the eraser leaves a visible
+  // gap as wide as the eraser once the round line caps are drawn.
+  const capsule = { ...sweep, r: sweep.r + thickness / 2 };
+
+  if (isInk) {
     let changed = false;
     const kept = [];
     for (const stroke of editor.serializeDraw(false).points) {
@@ -189,13 +194,16 @@ function cutEditor(editor, sweep) {
   }
 
   const outlines = editor._drawOutlines;
-  if (outlines.isFree) {
-    const thickness = editor._drawingOptions.thickness;
-    const capsule = { ...sweep, r: sweep.r + thickness / 2 };
+  if (isFree) {
     const [stroke] = outlines.serialize(rect, editor._drawRotation).points;
     const pieces = cutPolyline(stroke, capsule, MIN_PIECE_SIZE);
     // A freehand highlight holds a single line, so each piece is its own highlight.
-    return pieces?.map(piece => ({ ...base, thickness, outlines: { points: [piece] } })) ?? null;
+    // The points are in page coordinates, but pdf.js 6.4 rebuilds a freehand
+    // highlight as if they were turned by its rotation, which misplaces it in
+    // a rotated view (it does the same to its own highlights saved in a
+    // rotated view). Rotation 0 rebuilds it in place, like a highlight drawn
+    // before the view was rotated.
+    return pieces?.map(piece => ({ ...base, rotation: 0, thickness, outlines: { points: [piece] } })) ?? null;
   }
 
   // Text highlight: quadPoints are [xLeft, yTop, xRight, yTop, xLeft, yBottom, xRight, yBottom] per box.
