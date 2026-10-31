@@ -28,6 +28,10 @@ One drag is one undo step: **Ctrl+Z** brings back everything that drag erased, e
 With a pen, flip it to its eraser end (or hold its eraser button) to erase. When you lift it, you're back in the tool
 you were using before.
 
+For reading in the dark, the **Invert colours** button (the half-filled circle) turns pages black with white text. Pale
+colours such as highlights are lightened a little so they stay visible. Only the display changes: saved and printed
+PDFs keep their real colours. The viewer remembers the setting.
+
 ## Permissions and privacy
 
 - No permissions are needed to install it.
@@ -46,7 +50,8 @@ The extension bundles [pdf.js](https://github.com/mozilla/pdf.js), the PDF viewe
   so it has unit tests.
 - Each mark the eraser touches is replaced by new marks built from its remaining pieces, through pdf.js's own
   annotation editor objects. Saving then works exactly as it does in pdf.js.
-- `extension/` holds the extension itself: the manifest, the toolbar button, the start screen and Save as.
+- `extension/` holds the extension itself: the manifest, the toolbar button, the start screen, Save as and
+  inverted colours.
 
 ## Building from source
 

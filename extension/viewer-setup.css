@@ -32,3 +32,29 @@
     opacity: 0.8;
   }
 }
+
+/* Inverted colours (invert-colors.js). invert() turns white into black and
+   black into white; hue-rotate() then turns the colours back to their own
+   hue, so red stays red-ish instead of becoming cyan. The filter goes on the
+   whole canvas wrapper, so pencil marks and highlights drawn on top of the
+   page are inverted along with it. url(#invertColorsLift) is the gamma
+   curve that keeps pale colours visible (see invert-colors.js). */
+#invertColorsButton::before {
+  -webkit-mask-image: url(invert-colors.svg);
+  mask-image: url(invert-colors.svg);
+}
+
+.invertPageColors {
+  #viewer .page {
+    /* Shown until a page is drawn, so it doesn't flash white. */
+    --page-bg-color: rgb(0 0 0);
+
+    .canvasWrapper {
+      filter: invert(1) hue-rotate(180deg) url(#invertColorsLift);
+    }
+  }
+
+  .thumbnailImageContainer img {
+    filter: invert(1) hue-rotate(180deg) url(#invertColorsLift);
+  }
+}

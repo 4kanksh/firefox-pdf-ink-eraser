@@ -32,7 +32,7 @@ cpSync(vendor, join(out, "viewer"), { recursive: true, filter: path => !isUnused
 for (const file of ["eraser.js", "eraser-geometry.js", "eraser.css", "eraser.svg"]) {
   cpSync(join(root, "src", file), join(web, "ink-eraser", file));
 }
-for (const file of ["viewer-setup.js", "viewer-setup.css", "save-as.js"]) {
+for (const file of ["viewer-setup.js", "viewer-setup.css", "save-as.js", "invert-colors.js", "invert-colors.svg"]) {
   cpSync(join(root, "extension", file), join(web, "extension", file));
 }
 
@@ -51,6 +51,7 @@ inject(viewerCss, '<link rel="stylesheet" href="extension/viewer-setup.css" />')
 // The setup scripts must run before viewer.mjs, so they go in front of it.
 inject(viewerJs, '<script src="extension/viewer-setup.js"></script>', true);
 inject(viewerJs, '<script src="extension/save-as.js"></script>', true);
+inject(viewerJs, '<script src="extension/invert-colors.js"></script>', true);
 inject(viewerJs, '<script src="ink-eraser/eraser.js" type="module"></script>');
 writeFileSync(viewerHtml, html);
 
