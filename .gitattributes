@@ -1,0 +1,5 @@
+# Our files: always LF line endings, on every OS.
+* text=auto eol=lf
+
+# Third-party pdf.js: store and check out byte for byte, exactly as released.
+vendor/** -text
