@@ -1,0 +1,12 @@
+{
+  "name": "pdf-ink-eraser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A partial (pixel-style) eraser for pdf.js pencil drawings and highlights.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/",
+    "build": "node scripts/build.mjs"
+  },
+  "license": "Apache-2.0"
+}

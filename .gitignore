@@ -1,0 +1,13 @@
+# Build output: recreated by `npm run build`.
+dist/
+
+# Packaged extension files.
+*.xpi
+web-ext-artifacts/
+
+node_modules/
+
+# Editor and OS clutter.
+.vscode/
+.DS_Store
+Thumbs.db

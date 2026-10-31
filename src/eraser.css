@@ -1,0 +1,46 @@
+/* Partial eraser for the pdf.js viewer. */
+
+#editorInkEraserButton::before {
+  -webkit-mask-image: url(eraser.svg);
+  mask-image: url(eraser.svg);
+}
+
+#inkEraserCursor {
+  position: fixed;
+  z-index: 100000;
+  box-sizing: border-box;
+  border: 1px solid rgb(0 0 0 / 0.8);
+  border-radius: 50%;
+  /* A light ring outside the dark one keeps the cursor visible on any background. */
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.8);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+#inkEraserCursor[hidden] {
+  display: none;
+}
+
+/* The eraser runs on top of the pencil mode: hide the pencil's own state. */
+.inkEraserActive #editorInkParamsToolbar {
+  display: none !important;
+}
+
+.inkEraserActive #editorInkButton.toggled {
+  background-color: transparent;
+  color: inherit;
+
+  &::before {
+    background-color: var(--toolbar-icon-bg-color);
+  }
+}
+
+/* Pointer events go to the eraser, never to the pencil tool or existing marks. */
+.inkEraserActive #viewerContainer .page {
+  cursor: none;
+}
+
+.inkEraserActive .annotationEditorLayer,
+.inkEraserActive .annotationEditorLayer * {
+  pointer-events: none !important;
+}
