@@ -66,6 +66,14 @@ npm run build
 | `npm test` | Run the geometry unit tests |
 | `npm run lint` | Build, then check the extension with Mozilla's add-on linter |
 | `npm run package` | Build, then zip the extension into `web-ext-artifacts/` |
+| `npm run sign` | Build, then have Mozilla sign it as an unlisted add-on (see below) |
+
+### Signing
+
+Firefox only installs extensions permanently once Mozilla has signed them. `npm run sign` uploads the extension
+to addons.mozilla.org (AMO) and saves the signed `.xpi` in `web-ext-artifacts/`. It needs your AMO API key in two
+environment variables: `WEB_EXT_API_KEY` (the "JWT issuer") and `WEB_EXT_API_SECRET` (the "JWT secret"). Never
+commit them.
 
 ### Browser tests
 
