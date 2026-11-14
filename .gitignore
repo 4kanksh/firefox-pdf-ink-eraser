@@ -7,6 +7,10 @@ web-ext-artifacts/
 
 node_modules/
 
+# Written by `npm run helper:install`, with paths on this computer.
+native-helper/converter.bat
+native-helper/pdf_ink_eraser_office.json
+
 # Editor and OS clutter.
 .vscode/
 .DS_Store

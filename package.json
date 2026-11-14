@@ -1,6 +1,6 @@
 {
   "name": "pdf-ink-eraser",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "Firefox extension: draw and highlight on PDFs, then erase exactly where you drag.",
   "type": "module",
@@ -10,7 +10,9 @@
     "lint": "npm run build && web-ext lint --source-dir dist/extension",
     "start": "npm run build && web-ext run --source-dir dist/extension --url about:debugging#/runtime/this-firefox",
     "package": "npm run build && web-ext build --source-dir dist/extension --artifacts-dir web-ext-artifacts --overwrite-dest",
-    "sign": "npm run build && web-ext sign --source-dir dist/extension --artifacts-dir web-ext-artifacts --channel unlisted"
+    "sign": "npm run build && web-ext sign --source-dir dist/extension --artifacts-dir web-ext-artifacts --channel unlisted",
+    "helper:install": "npm ci --prefix native-helper --ignore-scripts --no-audit --no-fund && node native-helper/install.mjs",
+    "helper:uninstall": "node native-helper/install.mjs uninstall"
   },
   "license": "Apache-2.0",
   "devDependencies": {

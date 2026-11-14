@@ -12,7 +12,7 @@
     "default_title": "Open PDF Ink Eraser",
     "default_icon": "icons/icon.svg"
   },
-  "optional_permissions": ["downloads"],
+  "optional_permissions": ["downloads", "nativeMessaging"],
   "background": {
     "scripts": ["background.js"]
   },

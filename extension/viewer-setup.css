@@ -1,6 +1,8 @@
-/* Start hint shown until a PDF is opened. */
+/* Start hint shown until a PDF is opened, and the messages shown while
+   converting a Word or PowerPoint file (showMessage in viewer-setup.js). */
 
-#startHint {
+#startHint,
+#viewerMessage {
   position: absolute;
   inset: 0;
   display: flex;
@@ -28,9 +30,17 @@
   }
 
   > p {
-    margin: 0;
+    max-width: 32em;
+    margin: 0 16px;
+    text-align: center;
     opacity: 0.8;
   }
+}
+
+/* Over the pages, where pdf.js puts its scrolling viewer. */
+#viewerMessage {
+  inset: var(--toolbar-height) 0 0;
+  background-color: var(--body-bg-color);
 }
 
 /* Inverted colours (invert-colors.js). invert() turns white into black and

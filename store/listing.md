@@ -35,9 +35,13 @@ Shortcuts:
 
 How to use it: click the add-on's toolbar button to open the viewer, then open a PDF or drop one onto the page.
 
-Private by design: everything happens in your browser. The add-on collects no data and doesn't connect to the
-internet. It asks for one optional permission, "Download files", the first time you save. That is what shows the Save as
-dialog; without it, files go to your Downloads folder.
+Word and PowerPoint files open too, converted to PDF on your computer, with a free helper program you install once
+(Windows, needs Node.js). Setup: https://github.com/4kanksh/firefox-pdf-ink-eraser#word-and-powerpoint-files-optional-helper
+
+Private by design: everything happens on your computer. The add-on collects no data and doesn't connect to the
+internet. It asks for two optional permissions, only when needed: "Download files" the first time you save, which shows
+the Save as dialog (without it, files go to your Downloads folder), and "Exchange messages with programs other than
+Firefox" the first time you open a Word or PowerPoint file, which starts the helper.
 
 Built on pdf.js, the PDF viewer inside Firefox, included unmodified.
 
@@ -60,6 +64,13 @@ Apache License 2.0
 ## Privacy policy
 
 Not needed: the add-on collects no data. The manifest declares `data_collection_permissions: none`.
+
+## Release notes (1.1.0)
+
+Open Word and PowerPoint files (.docx, .doc, .pptx, .ppt, .odt, .odp, .rtf): they're converted to PDF on your
+computer and open like any PDF. This needs a helper program installed once; see
+https://github.com/4kanksh/firefox-pdf-ink-eraser#word-and-powerpoint-files-optional-helper. Without it, everything
+else works as before.
 
 ## Release notes (1.0.1)
 
@@ -94,13 +105,20 @@ comparison with the release:
     3e229a3c44633df56690108b873ff572f642f9d301b70820f01ef535ebeac781  viewer/web/viewer.mjs
     81437fc949d6418dc20d4382dd25a852e4fab33120a83d332f97542259e1175d  viewer/web/viewer.css
 
-The only change to a pdf.js file: five tags added to `viewer/web/viewer.html`, which load our own files:
+The only change to a pdf.js file: seven tags added to `viewer/web/viewer.html`, which load our own files:
 
-- `viewer/web/extension/`: start screen, Save as (`browser.downloads`) and inverted colours
+- `viewer/web/extension/`: start screen, Save as (`browser.downloads`), opening Word and PowerPoint files and
+  inverted colours
 - `viewer/web/ink-eraser/`: the eraser
 
 `background.js` only opens the viewer in a new tab. None of our code is minified or generated, so there is no separate
 source code to submit. The optional `downloads` permission is requested only when the user saves, to show a Save as
 dialog. There is no remote code and no network access.
+
+The optional `nativeMessaging` permission is requested only when the user opens a Word or PowerPoint file. The viewer
+(`viewer/web/extension/office-files.js`) then sends that file to a helper program the user installed themselves,
+`pdf_ink_eraser_office`, which converts it to PDF with LibreOffice compiled to WebAssembly and sends the PDF back. The
+helper isn't part of this package; its source and installer are in `native-helper/` of
+https://github.com/4kanksh/firefox-pdf-ink-eraser.
 
 To build the package from source: `npm install`, then `npm run package` (Node 20 or newer).

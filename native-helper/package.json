@@ -1,0 +1,11 @@
+{
+  "name": "pdf-ink-eraser-office-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Converts Word and PowerPoint files to PDF for PDF Ink Eraser, with LibreOffice compiled to WebAssembly.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@matbee/libreoffice-converter": "2.7.2"
+  }
+}
