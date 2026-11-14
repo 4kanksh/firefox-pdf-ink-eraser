@@ -1,6 +1,6 @@
 # PDF Ink Eraser
 
-A Firefox extension for drawing and highlighting on PDFs, with a real eraser. It also opens Word and PowerPoint files.
+A Firefox extension for drawing and highlighting on PDFs, with a real eraser. It also opens Word and PowerPoint files by converting it pdfs. It also allows inverting the colours of the pdf with one click.
 
 ## Install
 
